@@ -1,0 +1,24 @@
+{
+    "files.associations": {
+        "*.tcc": "cpp",
+        "string": "cpp",
+        "chrono": "cpp",
+        "array": "cpp",
+        "string_view": "cpp",
+        "initializer_list": "cpp",
+        "utility": "cpp",
+        "new": "cpp",
+        "thread": "cpp"
+    },
+    "vim.useCtrlKeys": false,
+    "editor.formatOnSave": true,
+    "editor.detectIndentation": false,
+    "vetur.format.options.tabSize": 4,
+    "vetur.format.options.useTabs": false,
+    "[yaml]": {
+        "editor.insertSpaces": true,
+        "editor.tabSize": 4,
+        "editor.autoIndent": "advanced"
+    },
+    "C_Cpp.clang_format_fallbackStyle": "WebKit"
+}

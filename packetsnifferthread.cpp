@@ -1,321 +1,327 @@
-#include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
-#include <pcap.h>
 #include <arpa/inet.h>
+#include <pcap.h>
+#include <pfring.h>
 #include <time.h>
 
 #include <QDebug>
 #include <QHash>
 
-#include <QFile>
 #include <QDataStream>
+#include <QFile>
 #include <QFileDialog>
 #include <QStandardPaths>
 
-#include "packetsnifferthread.h"
-#include "modelcolumnindexes.h"
 #include "ethernet.h"
+#include "modelcolumnindexes.h"
+#include "packetsnifferthread.h"
 
 #include "colors.h"
 #include "shared.h"
 #include "tags.h"
+const int kPfingMaxPackerSize = 65536;
 
-
-PacketSnifferThread::PacketSnifferThread(QStandardItemModel *packetModel, QStatusBar *statusBar){
+PacketSnifferThread::PacketSnifferThread(QStandardItemModel* packetModel, QStatusBar* statusBar, QString device_name)
+{
     this->packetModel = packetModel;
     this->statusBar = statusBar;
     stopCapture = false;
     packetNumber = 0;
     rawDataView = Binary;
     captureSaved = false;
+    device = device_name.toStdString();
 }
 
-PacketSnifferThread::PacketSnifferThread(QStandardItemModel *packetModel, QString filePath, QStatusBar *statusBar){
+PacketSnifferThread::PacketSnifferThread(QStandardItemModel* packetModel, QString& filePath, QStatusBar* statusBar)
+{
     this->packetModel = packetModel;
     this->statusBar = statusBar;
     stopCapture = false;
     packetNumber = 0;
     rawDataView = Binary;
     captureSaved = false;
-    
+
     QHash<QString, QColor> protocolColors;
-    protocolColors.insert("ARP", QColor(255, 125, 125));      //Light Red
-    protocolColors.insert("DNS", QColor(183, 247, 119));      //Light Green
-    protocolColors.insert("HTTP", QColor(150, 255, 255));     //Light Cyan
-    protocolColors.insert("HTTPS", QColor(121, 201, 201));    //Dark Cyan
-    protocolColors.insert("ICMP", QColor(232, 209, 255));     //Light Purple
-    protocolColors.insert("Unknown", QColor(255, 253, 140));  //Light Yellow
-    
-    const u_char *data;
-    
+    protocolColors.insert("ARP", QColor(255, 125, 125)); // Light Red
+    protocolColors.insert("DNS", QColor(183, 247, 119)); // Light Green
+    protocolColors.insert("HTTP", QColor(150, 255, 255)); // Light Cyan
+    protocolColors.insert("HTTPS", QColor(121, 201, 201)); // Dark Cyan
+    protocolColors.insert("ICMP", QColor(232, 209, 255)); // Light Purple
+    protocolColors.insert("TCP", QColor(218, 112, 214)); // 兰花的紫色
+    protocolColors.insert("UDP", QColor(0, 255, 255)); // 青色
+    protocolColors.insert("Unknown", QColor(255, 253, 140)); // Light Yellow
+
     QFile file(filePath);
-    file.open(QIODevice::ReadOnly);
-    
-    char sizeandtimestamp[8]; // Size and timestamp buffer
-    while(file.read(sizeandtimestamp, 8) > 0){
-        QList<QStandardItem *> row;                                          //The new row to be inserted
-        
-        //Append the number of the packet
-        QStandardItem *packetNumberItem = new QStandardItem();
+    if (!(file.open(QIODevice::ReadOnly))) {
+        statusBar->showMessage(QString("Couldn't open %1").arg(filePath));
+        return;
+    }
+    QDataStream packetStream(&file);
+
+    qint32 packetCount;
+    packetStream.readRawData((char*)&packetCount, sizeof(qint32));
+
+    char* dateTime;
+    uint timeLen;
+    char* packetInfo;
+    char* newData;
+    qint32 packetSize;
+    for (int i = 0; i < packetCount; ++i) {
+
+        QList<QStandardItem*> row;
+        QStandardItem* packetNumberItem = new QStandardItem();
         packetNumberItem->setData(QVariant(packetNumber), Qt::DisplayRole);
         row.append(packetNumberItem);
-        printf(GREEN "Packet #%d\n" NORMAL, packetNumber);
-        
         packetNumber++;
-        
-        uint *size        = (uint *)&(sizeandtimestamp[0]);
-        time_t *timestamp = (time_t *)&(sizeandtimestamp[4]);
-        
-        //Append the timestamp
-        timeStamps.push_back(*timestamp);
-        struct tm *tmptr = localtime(timestamp);
-        printf(CYAN "	Time:\n" RESET);
-        printf("		Y/M/D h:m:s -- %d/%02d/%02d %02d:%02d:%02d\n", tmptr->tm_year+1900, tmptr->tm_mon+1, tmptr->tm_mday, tmptr->tm_hour, tmptr->tm_min, tmptr->tm_sec);
-        printf("		epoch time --- %ld seconds\n", (long)(*timestamp));
-        
-        char date[20];
-        snprintf(date, sizeof(date), "%d/%02d/%02d %02d:%02d:%02d", tmptr->tm_year+1900, 
-                                                                    tmptr->tm_mon+1, 
-                                                                    tmptr->tm_mday, 
-                                                                    tmptr->tm_hour, 
-                                                                    tmptr->tm_min, 
-                                                                    tmptr->tm_sec);
-        date[sizeof(date)-1] = '\0';
-        row.append(new QStandardItem(QString(date)));
-        
-        char packetData[*size];
-        
-        file.read(packetData, *size);
-        
-        //This has to be done first so that the source, destination, protocol, and info fields can be filled in
-        handle_ethernet(&row, (uint8_t *) packetData);
-        
-        //Some protocols are not implemented yet, so sometimes this function will return and the row will have
-        //less than 6 columns filled in, if this is the case, keep appending 'Unknown' to row until every 
-        //column is filled in
-        while(row.size() < 6){
-            row.append(new QStandardItem("Unknown"));
-        }
-        
-        //Copy the full packet into newData
-        char *newData = (char *)malloc(*size);
-        if(newData == NULL){
-            printf("ERROR: Malloc failed\n");
+        packetStream.readBytes(dateTime, timeLen); // 同时读取数据包到达时间，和长度
+        QString str = QString::fromLocal8Bit(dateTime, timeLen); //可处理汉字
+        row.append(new QStandardItem(str));
+        packetStream.readRawData((char*)&packetSize, sizeof(qint32));
+        packetInfo = new char[packetSize] { 0 };
+        newData = new char[packetSize] { 0 };
+        if (newData == nullptr || packetInfo == nullptr) {
+            statusBar->showMessage(QString("Failed to apply for memory!"));
             exit(1);
         }
-        memcpy(newData, (void*)packetData, *size);
-        
-        //Inset the full size column
-        QStandardItem *binaryDataSizeItem = new QStandardItem();
-        binaryDataSizeItem->setData(QVariant(*size), Qt::DisplayRole);
-        row.insert(BINARY_DATA_SIZE_COLUMN_INDEX, binaryDataSizeItem);
+        packetStream.readRawData(packetInfo, packetSize); // 同时读取数据包内容，和长度
+        memcpy(newData, (void*)packetInfo, packetSize);
         rawData.push_back(newData);
-        
-        //Set the color of the packet to distinguish it from other packets
-        if(protocolColors.contains(row.at(HIGHEST_LEVEL_PROTOCOL_COLUMN_INDEX)->text())){
+        if (packetInfo != nullptr)
+            handle_ethernet(&row, (uint8_t*)packetInfo);
+        // 某些协议尚未实现，因此有时此函数将返回并且该行将具有
+        // 少于6列，如果是这种情况，则在行中附加“未知”
+        while (row.size() < 6) {
+            row.append(new QStandardItem("Unknown"));
+        }
+
+        QStandardItem* binaryDataSizeItem = new QStandardItem();
+        binaryDataSizeItem->setData(QVariant(packetSize), Qt::DisplayRole);
+        row.insert(BINARY_DATA_SIZE_COLUMN_INDEX, binaryDataSizeItem);
+
+        if (protocolColors.contains(row.at(HIGHEST_LEVEL_PROTOCOL_COLUMN_INDEX)->text())) {
             setBackgroundColor(&row, protocolColors.value(row.at(HIGHEST_LEVEL_PROTOCOL_COLUMN_INDEX)->text()));
         }
-        
-        //Add the row to the model
         packetModel->appendRow(row);
     }
 }
 
-PacketSnifferThread::~PacketSnifferThread(){
-    for(size_t i=0; i<rawData.size(); i++){
+PacketSnifferThread::~PacketSnifferThread()
+{
+    for (size_t i = 0; i < rawData.size(); i++) {
         free(rawData.at(i));
     }
-    
+
     rawData.clear();
 }
 
-void PacketSnifferThread::stopCapturing(void){
+void PacketSnifferThread::stopCapturing(void)
+{
     stopCapture = true;
 }
 
-void PacketSnifferThread::run(){
+void PacketSnifferThread::run()
+{
+
+    // 设置协议的颜色
     QHash<QString, QColor> protocolColors;
-    protocolColors.insert("ARP", QColor(255, 125, 125));      //Light Red
-    protocolColors.insert("DNS", QColor(183, 247, 119));      //Light Green
-    protocolColors.insert("HTTP", QColor(150, 255, 255));     //Light Cyan
-    protocolColors.insert("HTTPS", QColor(121, 201, 201));    //Dark Cyan
-    protocolColors.insert("ICMP", QColor(232, 209, 255));     //Light Purple
-    protocolColors.insert("Unknown", QColor(255, 253, 140));  //Light Yellow
-    
-    const char *device = ETHERNET_DEVICE;   //The device to sniff on
-    pcap_t *handle;                         //The session handle
-    char errorBuffer[PCAP_ERRBUF_SIZE];     //The buffer to store error messages in
-    bpf_u_int32 networkNumber;              //32 bit network address
-    bpf_u_int32 networkMask;                //32 bit network mask
-    pcap_pkthdr *header;
-    const u_char *data;
+    protocolColors.insert("ARP", QColor(255, 125, 125)); //Light Red
+    protocolColors.insert("DNS", QColor(183, 247, 119)); //Light Green
+    protocolColors.insert("TCP", QColor(218, 112, 214)); // 兰花的紫色
+    protocolColors.insert("UDP", QColor(0, 255, 255)); // 青色
+    protocolColors.insert("HTTP", QColor(150, 255, 255)); //Light Cyan
+    protocolColors.insert("HTTPS", QColor(121, 201, 201)); //Dark Cyan
+    protocolColors.insert("ICMP", QColor(232, 209, 255)); //Light Purple
+    protocolColors.insert("Unknown", QColor(255, 253, 140)); //Light Yellow
+
+    pfring* handle;
+    char errorBuffer[PCAP_ERRBUF_SIZE];
+    bpf_u_int32 networkNumber; //32 bit MAC 地址
+    bpf_u_int32 networkMask; //32 bit MAC 掩码
+    struct pfring_pkthdr header;
+    uint8_t* data = nullptr;
+    uint8_t temp_buffer[kPfingMaxPackerSize];
+    data = temp_buffer;
     captureSaved = false;
-    
-    //Obtain the network address and the network mask for the device
-    if(pcap_lookupnet(device, &networkNumber, &networkMask, errorBuffer) == -1){
-        statusBar->showMessage(QString("Can't get netmask for device %1, %2").arg(QString(device)).arg(QString(errorBuffer)));
+    // 获取设备的网络地址和网络掩码
+    if (pcap_lookupnet(device.c_str(), &networkNumber, &networkMask, errorBuffer) == -1) {
+        statusBar->showMessage(QString("Can't get netmask for device %1, %2").arg(QString(device.c_str())).arg(QString(errorBuffer)));
         networkNumber = 0;
         networkMask = 0;
     }
-    
-    //Obtain a handle to the device, open the session in promiscuous mode
-    handle = pcap_open_live(device, BUFSIZ, 1, 1000, errorBuffer);
-    if(handle == NULL){
-        statusBar->showMessage(QString("Couldn't open device %1, %2").arg(QString(device)).arg(QString(errorBuffer)));
+
+    // 获取设备的句柄，以混杂模式打开pfring
+    handle = pfring_open(device.c_str(), 1500, PF_RING_PROMISC); // 混杂模式打开
+    if (handle == nullptr) {
+        statusBar->showMessage(QString("Couldn't open device %1").arg(QString(device.c_str())));
         return;
     }
-    
+
+    // 设置BPF过滤器
+    /*
+    if (pfring_set_bpf_filter(handle, "tcp")) {
+        statusBar->showMessage(QString("Failed to set BPF filter"));
+        return;
+    }*/
+
+    // 启用pfring
+    pfring_enable_ring(handle);
     int returnValue;
-    while((returnValue = pcap_next_ex(handle, &header, &data)) >= 0 && stopCapture == false){
-        if(returnValue == 1){
-            //Get the time recieved for this packet.
-            time_t currentTime = time(NULL);
-            timeStamps.push_back(currentTime);
-            struct tm *tmptr = localtime(&currentTime);
+
+    // 当有数据包时，该函数返回一个捕获的数据包
+    while ((returnValue = pfring_recv(handle, &data, kPfingMaxPackerSize, &header, 0)) >= 0 && stopCapture == false) {
+        if (returnValue > 0) {
+            // 获取此数据包收到的时间
+            tm tmp_time;
+            char date_time[64] = { 0 };
+            strftime(date_time, sizeof(date_time), "%Y-%m-%d %H:%M:%S", localtime_r(&header.ts.tv_sec, &tmp_time));
+
+            // Linux终端打印时间
             printf(CYAN "	Time:\n" RESET);
-            printf("		Y/M/D h:m:s -- %d/%02d/%02d %02d:%02d:%02d\n", tmptr->tm_year+1900, tmptr->tm_mon+1, tmptr->tm_mday, tmptr->tm_hour, tmptr->tm_min, tmptr->tm_sec);
-            printf("		epoch time --- %ld seconds\n", (long)currentTime);
-                
-            //Append the time recieved column
-            char date[20];
-            snprintf(date, sizeof(date), "%d/%02d/%02d %02d:%02d:%02d", tmptr->tm_year+1900, 
-                                                                        tmptr->tm_mon+1, 
-                                                                        tmptr->tm_mday, 
-                                                                        tmptr->tm_hour, 
-                                                                        tmptr->tm_min, 
-                                                                        tmptr->tm_sec);
-            date[sizeof(date)-1] = '\0';
-            
-            QList<QStandardItem *> row;                                          //The new row to be inserted
-            
-            
-            //Append the number of the packet
-            QStandardItem *packetNumberItem = new QStandardItem();
+            printf("		Y/M/D h:m:s -- %s\n", date_time);
+            printf("		Microseconds --- %ld\n", header.ts.tv_usec);
+
+            timeStamps.push_back(date_time);
+            QList<QStandardItem*> row;
+
+            // 将当前数据包的序号添加到界面栏
+            QStandardItem* packetNumberItem = new QStandardItem();
             packetNumberItem->setData(QVariant(packetNumber), Qt::DisplayRole);
             row.append(packetNumberItem);
-            
-            //Append the time column
-            row.append(new QStandardItem(QString(date)));
-            
+
+            // 将当前数据包的时间添加到界面栏
+            row.append(new QStandardItem(QString(date_time)));
+
             printf(GREEN "Recieved packet #%d\n" NORMAL, packetNumber);
-            
+
             packetNumber++;
-            
-            //This has to be done first so that the source, destination, protocol, and info fields can be filled in
+
+            // 转到以太网层解析
             handle_ethernet(&row, data);
-            
-            //Some protocols are not implemented yet, so sometimes this function will return and the row will have
-            //less than 6 columns filled in, if this is the case, keep appending 'Unknown' to row until every 
-            //column is filled in
-            while(row.size() < 6){
+
+            // 某些协议尚未实现，因此有时此函数将返回并且该行将具有
+            // 少于6列，如果是这种情况，则在行中附加“未知”
+            while (row.size() < 6) {
                 row.append(new QStandardItem("Unknown"));
             }
-            
-            //Copy the full packet into newData
-            char *newData = (char *)malloc(header->len);
-            if(newData == NULL){
-                printf("ERROR: Malloc failed\n");
+
+            char* newData = new char[handle->caplen] { 0 };
+            if (newData == nullptr) {
+                statusBar->showMessage(QString("Failed to apply for memory!"));
                 exit(1);
             }
-            memcpy(newData, (void*)data, header->len);
-            
-            //Inset the full size column
-            QStandardItem *binaryDataSizeItem = new QStandardItem();
-            binaryDataSizeItem->setData(QVariant(header->len), Qt::DisplayRole);
+            memcpy(newData, (void*)data, header.caplen);
+
+            // 将捕获的数据包大小添加到界面栏
+            QStandardItem* binaryDataSizeItem = new QStandardItem();
+            binaryDataSizeItem->setData(QVariant(header.caplen), Qt::DisplayRole);
             row.insert(BINARY_DATA_SIZE_COLUMN_INDEX, binaryDataSizeItem);
             rawData.push_back(newData);
-            
-            //Set the color of the packet to distinguish it from other packets
-            if(protocolColors.contains(row.at(HIGHEST_LEVEL_PROTOCOL_COLUMN_INDEX)->text())){
+
+            // 设置数据包的颜色以区别于其他数据包
+            if (protocolColors.contains(row.at(HIGHEST_LEVEL_PROTOCOL_COLUMN_INDEX)->text())) {
                 setBackgroundColor(&row, protocolColors.value(row.at(HIGHEST_LEVEL_PROTOCOL_COLUMN_INDEX)->text()));
             }
-            
-            //Add the row to the model
+
             packetModel->appendRow(row);
         }
     }
-    if(returnValue == -1){
+    if (returnValue == -1) {
         printf(RED "An error occured while capturing.\n" RESET);
     }
-    
+
     stopCapture = false;
-    
-    pcap_close(handle);
+
+    // 关闭之前打开的pfring设备
+    pfring_close(handle);
 }
 
-void PacketSnifferThread::fillInfoAndRawDataWidgets(QPlainTextEdit *infoTextEdit, QPlainTextEdit *rawDataTextEdit, int index, int size){
-    //Append the packet info to the infoTextEdit
+void PacketSnifferThread::fillInfoAndRawDataWidgets(QPlainTextEdit* infoTextEdit, QPlainTextEdit* rawDataTextEdit, int index, int size)
+{
+    // 添加数据包的概要信息
     QString infoStr;
-    
-    //infoStr += QString("Packet #%1").arg(pack) + NEWLINE;
-    
+
     handle_ethernet_fill(&infoStr, rawData.at(index));
     infoTextEdit->clear();
     infoTextEdit->appendHtml(infoStr);
-    
-    //Append the raw binary data to the rawDataTextEdit
+
+    // 添加数据包的原始数据信息
     rawDataTextEdit->clear();
     QString rawDataText;
-    if(rawDataView == Binary){
-        for(int i=0; i<size; i++){
+
+    // 二进制数据包信息
+    if (rawDataView == Binary) {
+        for (int i = 0; i < size; i++) {
             uint8_t byte = rawData.at(index)[i];
-            uint8_t mask = 0x80;  //1000 0000
-            while(mask > 0){
+            uint8_t mask = 0x80; //1000 0000
+            while (mask > 0) {
                 rawDataText.append((byte & mask) ? '1' : '0');
                 mask >>= 1;
             }
             rawDataText.append(' ');
         }
     }
-    else if(rawDataView == Hexadecimal){
+    // 十六进制数据包信息
+    else if (rawDataView == Hexadecimal) {
         char hexBuffer[3];
-        for(int i=0; i<size; i++){
-            snprintf(hexBuffer, sizeof(hexBuffer), "%02X", ((uint8_t *)rawData.at(index))[i]);
+        for (int i = 0; i < size; i++) {
+            snprintf(hexBuffer, sizeof(hexBuffer), "%02X", ((uint8_t*)rawData.at(index))[i]);
             rawDataText.append(hexBuffer);
             rawDataText.append(' ');
         }
     }
-    
+
     rawDataTextEdit->appendHtml(rawDataText);
 }
 
-void PacketSnifferThread::setRawDataView(RawDataView rawDataView){
+void PacketSnifferThread::setRawDataView(RawDataView rawDataView)
+{
     this->rawDataView = rawDataView;
 }
 
-bool PacketSnifferThread::saveCapture(QString filePath){
-    if(captureSaved == true){
+bool PacketSnifferThread::saveCapture(QString filePath)
+{
+    if (captureSaved == true) {
         return false;
     }
-    
+
     QFile saveFile(filePath);
-    if(saveFile.open(QFile::WriteOnly) == false){ //Cant open the file
+    if (saveFile.open(QFile::WriteOnly) == false) { // 打开文件失败
         return false;
     }
-    if(saveFile.exists() && saveFile.isWritable()){
+    if (saveFile.exists() && saveFile.isWritable()) {
         QDataStream byteStream(&saveFile);
-        //File opened, proceed to write the data to it
-        for(uint32_t i=0; i<rawData.size(); i++){  //For every packet
-            //Write the size of the packet, and the date recieved to the file
-            uint size = packetModel->data(packetModel->index(i, BINARY_DATA_SIZE_COLUMN_INDEX)).toUInt();
-            
-            byteStream.writeRawData((const char *)&size, sizeof(size));               //The packet size
-            byteStream.writeRawData((const char *)&timeStamps.at(i), sizeof(time_t)); //The timestamp
-            
-            //Write the data
-            if(byteStream.writeRawData(rawData.at(i), size) == -1){
-                saveFile.close();
-                return false;
-            }
+        // 文件已打开，将每一个数据包写入文件中
+        qint32 count = rawData.size();
+        byteStream.writeRawData((char*)&count, sizeof(qint32)); // 数据包个数
+
+        for (uint32_t i = 0; i < count; i++) {
+            // 将数据包的大小和接收日期写入文件
+            qint32 size = packetModel->data(packetModel->index(i, BINARY_DATA_SIZE_COLUMN_INDEX)).toInt();
+            QString time = QString(timeStamps[i]);
+            QByteArray btArrayTime = time.toUtf8();
+            byteStream.writeBytes(btArrayTime, btArrayTime.length()); // 日期
+            byteStream.writeRawData((char*)&size, sizeof(qint32)); // 数据包个数
+            byteStream.writeRawData(rawData[i], size);
         }
         captureSaved = true;
-    }
-    else{
+    } else {
         return false;
     }
-    
+
     return true;
+}
+
+std::vector<std::string> PacketSnifferThread::get_device_list()
+{
+    pfring_if_t* dev = pfring_findalldevs();
+    std::vector<std::string> ans;
+    while (dev != nullptr) {
+        ans.push_back(dev->name);
+        dev = dev->next;
+    }
+    return ans;
 }

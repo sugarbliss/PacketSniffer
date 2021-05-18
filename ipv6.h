@@ -8,16 +8,16 @@
 
 //IPv6 header and macros
 struct sniff_ipv6 {
-	uint32_t  ip6_vtcfl;		//version, traffic class, flow label
-	uint16_t  ip6_len;			//The length of the payload
-	uint8_t   ip6_p;			//The next header
-	uint8_t   ip6_hop;			//The hop limit
-	char  	  ip6_src[16];		//The 128 bit source address
-	char  	  ip6_dst[16];		//The 128 bit destination address
+    uint32_t ip6_vtcfl; // 版本，流量类型，流标签
+    uint16_t ip6_len; // 有效载荷的长度
+    uint8_t ip6_p; // 协议类型
+    uint8_t ip6_hop; // 跳数限制
+    char ip6_src[16]; // 源地址
+    char ip6_dst[16]; // 目的地址
 };
-#define IPV6_HEADER_LENGTH 	40
-#define IPV6_VERSION(ip6) 	((ip6)->ip6_vtcfl & 0xF0000000)
+#define IPV6_HEADER_LENGTH 40
+#define IPV6_VERSION(ip6) ((ip6)->ip6_vtcfl & 0xF0000000)
 
-void handle_ipv6(QList<QStandardItem *> *row, const struct sniff_ipv6 *ip6);
+void handle_ipv6(QList<QStandardItem*>* row, const struct sniff_ipv6* ip6);
 
 #endif // IPV6_H

@@ -1,7 +1,6 @@
 <RCC>
     <qresource prefix="/images">
         <file>start_capture_button.png</file>
-        <file>stop_capture_button.png</file>
         <file>fit_columns.png</file>
         <file>clear_filter_button.png</file>
         <file>open.png</file>

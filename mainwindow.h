@@ -2,76 +2,74 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
-#include <QStandardItemModel>
 #include <QSortFilterProxyModel>
+#include <QStandardItemModel>
 
 #include <vector>
 
 #include "modelcolumnindexes.h"
+#include "new_window.h"
 #include "packetsnifferthread.h"
 
-
 /*
- * Table format:
+ * 表格格式:
  * 
- * +----------------------------+-----------------------------+----------------------------------+-------------------------------------+--------------------------+---------------------------+
- * | TIME_RECIEVED_COLUMN_INDEX | SOURCE_ADDRESS_COLUMN_INDEX | DESTINATION_ADDRESS_COLUMN_INDEX | HIGHEST_LEVEL_PROTOCOL_COLUMN_INDEX | INFORMATION_COLUMN_INDEX | BINARY_INDEX_COLUMN_INDEX |
- * +----------------------------+-----------------------------+----------------------------------+-------------------------------------+--------------------------+---------------------------+
- * |    YYYY/MM/DD hh:mm:ss     |    IPv4/IPv6/MAC address    |     IPv4/IPv6/MAC address        |        ARP/DNS/HTTP/ICMP/etc.       | Short summary of packet  |             0             |
- * +----------------------------+-----------------------------+----------------------------------+-------------------------------------+--------------------------+---------------- ----------+
- * |    2015/12/01 12:23:54     |         192.168.0.1         |           192.168.0.0            |                  ARP                |                          |             1             |
- * +----------------------------+-----------------------------+----------------------------------+-------------------------------------+--------------------------+---------------- ----------+
+ * +----------------------------+-----------------------------+----------------------------------+-------------------------------------+--------------------------+
+ * | TIME_RECIEVED_COLUMN_INDEX | SOURCE_ADDRESS_COLUMN_INDEX | DESTINATION_ADDRESS_COLUMN_INDEX | HIGHEST_LEVEL_PROTOCOL_COLUMN_INDEX | INFORMATION_COLUMN_INDEX |
+ * +----------------------------+-----------------------------+----------------------------------+-------------------------------------+--------------------------+
+ * |    YYYY/MM/DD hh:mm:ss     |    IPv4/IPv6/MAC address    |     IPv4/IPv6/MAC address        |        ARP/DNS/HTTP/ICMP/etc.       | Short summary of packet  |
+ * +----------------------------+-----------------------------+----------------------------------+-------------------------------------+--------------------------+
+ * |    2020/10/01 10:22:55     |         192.168.7.1         |           192.168.7.0            |                  ARP                |                          |
+ * +----------------------------+-----------------------------+----------------------------------+-------------------------------------+--------------------------+
  * 
  */
-
 
 namespace Ui {
 class MainWindow;
 }
 
-class MainWindow : public QMainWindow
-{
+class MainWindow : public QMainWindow {
     Q_OBJECT
-    
+
 public:
-    explicit MainWindow(QWidget *parent = 0);
+    explicit MainWindow(QWidget* parent = 0);
     ~MainWindow();
-    
+    new_window* new_win;
 private slots:
-    void on_startCaptureButton_clicked();                      //Start the packet capture
-    void on_stopCaptureButton_clicked();                       //Stop the packet capture
-    void on_actionResize_Columns_triggered();                  //Resize the columns to the contents
-    void on_packetTableView_clicked(const QModelIndex &index); //A packet is clicked on
-    void on_filterLineEdit_returnPressed();                    //The user has pressed enter on the filter QLineEdit, apply the filter
-    
-    void on_hexViewRawButton_clicked();   //The user wants to switch the raw packet view to hexadecimal
-    void on_binViewRawButton_clicked();   //The user wants to switch the raw packet view to binary
-    
-    void on_clearFilterButton_clicked();  //The user wants to clear the filter text in the filter QLineEdit
-    
-    void on_actionSave_triggered();       //Save the current capture, only if it is not running
-    
+    void on_startCaptureButton_clicked(); // 开始抓包
+    void on_actionResize_Columns_triggered(); // 调整列的大小
+    void on_packetTableView_clicked(const QModelIndex& index); // 点击一个数据包时显示详细信息
+
+    void on_hexViewRawButton_clicked(); // 原始数据包视图切换为十六进制
+    void on_binViewRawButton_clicked(); // 原始数据包视图切换为二进制
+
+    void on_clearFilterButton_clicked(); // 清除过滤器QLineEdit中的过滤器文本
+
+    void on_actionSave_triggered(); // 仅在当前捕获未运行时保存它
+
     void on_pauseCaptureButton_clicked();
-    
+
     void on_actionNew_Capture_triggered();
-    
+
     void on_actionOpen_triggered();
-    
+
     void on_deleteCaptureButton_clicked();
-    
+
     void on_actionStart_triggered();
-    
+
     void on_actionPause_triggered();
-    
+
     void on_actionClear_triggered();
-    
+
+    void select_filter_mode(); // 选择过滤模式
+
 private:
-    Ui::MainWindow *ui;
+    Ui::MainWindow* ui;
     int numPackets;
-    QStandardItemModel *packetModel;
-    QSortFilterProxyModel *packetModelProxy;
-    PacketSnifferThread *packetSnifferThread;
-    
+    QStandardItemModel* packetModel;
+    QSortFilterProxyModel* packetModelProxy;
+    PacketSnifferThread* packetSnifferThread;
+
     bool isCapturing;
     bool isSaved;
 };
