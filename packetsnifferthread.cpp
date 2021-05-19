@@ -3,29 +3,29 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <pfring.h>
 #include <arpa/inet.h>
 #include <pcap.h>
-#include <pfring.h>
 #include <time.h>
 
 #include <QDebug>
 #include <QHash>
-
 #include <QDataStream>
 #include <QFile>
 #include <QFileDialog>
 #include <QStandardPaths>
-
 #include "ethernet.h"
 #include "modelcolumnindexes.h"
 #include "packetsnifferthread.h"
+#include "mainwindow.h"
 
 #include "colors.h"
 #include "shared.h"
 #include "tags.h"
+
 const int kPfingMaxPackerSize = 65536;
 
-PacketSnifferThread::PacketSnifferThread(QStandardItemModel* packetModel, QStatusBar* statusBar, QString device_name)
+PacketSnifferThread::PacketSnifferThread(QStandardItemModel* packetModel, QStatusBar* statusBar, QString device_name, QString bpf_filter)
 {
     this->packetModel = packetModel;
     this->statusBar = statusBar;
@@ -34,6 +34,7 @@ PacketSnifferThread::PacketSnifferThread(QStandardItemModel* packetModel, QStatu
     rawDataView = Binary;
     captureSaved = false;
     device = device_name.toStdString();
+    bpfFilter = bpf_filter.toStdString();
 }
 
 PacketSnifferThread::PacketSnifferThread(QStandardItemModel* packetModel, QString& filePath, QStatusBar* statusBar)
@@ -118,8 +119,7 @@ PacketSnifferThread::~PacketSnifferThread()
     rawData.clear();
 }
 
-void PacketSnifferThread::stopCapturing(void)
-{
+void PacketSnifferThread::stopCapturing(void) {
     stopCapture = true;
 }
 
@@ -161,11 +161,15 @@ void PacketSnifferThread::run()
     }
 
     // 设置BPF过滤器
-    /*
-    if (pfring_set_bpf_filter(handle, "tcp")) {
-        statusBar->showMessage(QString("Failed to set BPF filter"));
-        return;
-    }*/
+
+    char* bpffilter = (char*)bpfFilter.data();
+    if (!bpfFilter.empty()) {
+        if (pfring_set_bpf_filter(handle, bpffilter)) {
+            statusBar->showMessage(QString("Failed to set BPF filter"));
+            return;
+        }
+    }
+
 
     // 启用pfring
     pfring_enable_ring(handle);

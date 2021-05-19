@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>796</width>
-    <height>408</height>
+    <width>1081</width>
+    <height>573</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -22,6 +22,16 @@
       </property>
       <widget class="QWidget" name="layoutWidget">
        <layout class="QGridLayout" name="gridLayout">
+        <item row="0" column="5">
+         <widget class="QComboBox" name="combo_box_device_names"/>
+        </item>
+        <item row="0" column="4">
+         <widget class="QLabel" name="label">
+          <property name="text">
+           <string>Select Device</string>
+          </property>
+         </widget>
+        </item>
         <item row="0" column="10">
          <widget class="QPushButton" name="deleteCaptureButton">
           <property name="maximumSize">
@@ -42,101 +52,8 @@
           </property>
          </widget>
         </item>
-        <item row="0" column="8">
-         <widget class="QPushButton" name="startCaptureButton">
-          <property name="maximumSize">
-           <size>
-            <width>30</width>
-            <height>16777215</height>
-           </size>
-          </property>
-          <property name="toolTip">
-           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Start capturing packets, or append to the existing capture.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-          </property>
-          <property name="text">
-           <string/>
-          </property>
-          <property name="icon">
-           <iconset resource="resources.qrc">
-            <normaloff>:/images/start_capture_button.png</normaloff>:/images/start_capture_button.png</iconset>
-          </property>
-         </widget>
-        </item>
-        <item row="0" column="2">
-         <widget class="QLineEdit" name="filterLineEdit">
-          <property name="placeholderText">
-           <string>Enter filter text here</string>
-          </property>
-         </widget>
-        </item>
         <item row="0" column="6">
-         <widget class="QComboBox" name="combo_box_device_names"/>
-        </item>
-        <item row="1" column="0" colspan="11">
-         <widget class="QTableView" name="packetTableView">
-          <property name="styleSheet">
-           <string notr="true">gridline-color:black;</string>
-          </property>
-          <property name="sortingEnabled">
-           <bool>true</bool>
-          </property>
-          <attribute name="horizontalHeaderStretchLastSection">
-           <bool>true</bool>
-          </attribute>
-         </widget>
-        </item>
-        <item row="0" column="3">
-         <widget class="QPushButton" name="clearFilterButton">
-          <property name="maximumSize">
-           <size>
-            <width>30</width>
-            <height>16777215</height>
-           </size>
-          </property>
-          <property name="toolTip">
-           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Clear Filter&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-          </property>
-          <property name="text">
-           <string/>
-          </property>
-          <property name="icon">
-           <iconset resource="resources.qrc">
-            <normaloff>:/images/clear_filter_button.png</normaloff>:/images/clear_filter_button.png</iconset>
-          </property>
-         </widget>
-        </item>
-        <item row="0" column="9">
-         <widget class="QPushButton" name="pauseCaptureButton">
-          <property name="maximumSize">
-           <size>
-            <width>30</width>
-            <height>16777215</height>
-           </size>
-          </property>
-          <property name="toolTip">
-           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Pause the capturing of packets, can be resumed later (To clear the current capture, click the garbage icon to the right of this button)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-          </property>
-          <property name="text">
-           <string/>
-          </property>
-          <property name="icon">
-           <iconset resource="resources.qrc">
-            <normaloff>:/images/pause_button.png</normaloff>:/images/pause_button.png</iconset>
-          </property>
-         </widget>
-        </item>
-        <item row="0" column="5">
-         <widget class="QLabel" name="label">
-          <property name="text">
-           <string>Select Device</string>
-          </property>
-         </widget>
-        </item>
-        <item row="0" column="0">
-         <widget class="QLabel" name="filterLabel">
-          <property name="toolTip">
-           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Enter your filter text here, a regular expression can be used&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-          </property>
+         <widget class="QLabel" name="label_2">
           <property name="text">
            <string>Filter:</string>
           </property>
@@ -164,13 +81,96 @@
           </item>
          </widget>
         </item>
-        <item row="0" column="4">
+        <item row="0" column="0">
+         <widget class="QLabel" name="filterLabel">
+          <property name="toolTip">
+           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Enter your filter text here, a regular expression can be used&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          </property>
+          <property name="text">
+           <string>Search:</string>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="9">
+         <widget class="QPushButton" name="pauseCaptureButton">
+          <property name="maximumSize">
+           <size>
+            <width>30</width>
+            <height>16777215</height>
+           </size>
+          </property>
+          <property name="toolTip">
+           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Pause the capturing of packets, can be resumed later (To clear the current capture, click the garbage icon to the right of this button)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          </property>
+          <property name="text">
+           <string/>
+          </property>
+          <property name="icon">
+           <iconset resource="resources.qrc">
+            <normaloff>:/images/pause_button.png</normaloff>:/images/pause_button.png</iconset>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="0" colspan="11">
+         <widget class="QTableView" name="packetTableView">
+          <property name="styleSheet">
+           <string notr="true">gridline-color:black;</string>
+          </property>
+          <property name="sortingEnabled">
+           <bool>true</bool>
+          </property>
+          <attribute name="horizontalHeaderStretchLastSection">
+           <bool>true</bool>
+          </attribute>
+         </widget>
+        </item>
+        <item row="0" column="8">
+         <widget class="QPushButton" name="startCaptureButton">
+          <property name="maximumSize">
+           <size>
+            <width>30</width>
+            <height>16777215</height>
+           </size>
+          </property>
+          <property name="toolTip">
+           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Start capturing packets, or append to the existing capture.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          </property>
+          <property name="text">
+           <string/>
+          </property>
+          <property name="icon">
+           <iconset resource="resources.qrc">
+            <normaloff>:/images/start_capture_button.png</normaloff>:/images/start_capture_button.png</iconset>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="3">
          <widget class="QCheckBox" name="enable_match_case">
           <property name="contextMenuPolicy">
            <enum>Qt::NoContextMenu</enum>
           </property>
           <property name="text">
            <string>Match Case</string>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="2">
+         <widget class="QLineEdit" name="searchLineEdit">
+          <property name="text">
+           <string/>
+          </property>
+          <property name="placeholderText">
+           <string>Enter search text here</string>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="7">
+         <widget class="QLineEdit" name="filterlineEdit">
+          <property name="text">
+           <string/>
+          </property>
+          <property name="placeholderText">
+           <string>Enter filter text here</string>
           </property>
          </widget>
         </item>
@@ -315,7 +315,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>796</width>
+     <width>1081</width>
      <height>24</height>
     </rect>
    </property>

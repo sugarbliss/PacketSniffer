@@ -1,18 +1,19 @@
-#include <pfring.h>
+#include "mainwindow.h"
+
+
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <QDebug>
 #include <QDialogButtonBox>
 #include <QFileDialog>
 #include <QMessageBox>
-#include <QStandardPaths>
-
-#include <QDebug>
 #include <QRegExp>
 #include <QStandardItem>
+#include <QStandardPaths>
 
-#include "mainwindow.h"
 #include "ui_mainwindow.h"
+
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
@@ -20,21 +21,30 @@ MainWindow::MainWindow(QWidget* parent)
 {
     ui->setupUi(this);
     packetModel = new QStandardItemModel(0, 7, this);
-    packetModel->setHorizontalHeaderItem(PACKET_NUMBER_COLUMN_INDEX, new QStandardItem("#"));
-    packetModel->setHorizontalHeaderItem(TIME_RECIEVED_COLUMN_INDEX, new QStandardItem("Time"));
-    packetModel->setHorizontalHeaderItem(SOURCE_ADDRESS_COLUMN_INDEX, new QStandardItem("Src"));
-    packetModel->setHorizontalHeaderItem(DESTINATION_ADDRESS_COLUMN_INDEX, new QStandardItem("Dest"));
-    packetModel->setHorizontalHeaderItem(BINARY_DATA_SIZE_COLUMN_INDEX, new QStandardItem("Size"));
-    packetModel->setHorizontalHeaderItem(HIGHEST_LEVEL_PROTOCOL_COLUMN_INDEX, new QStandardItem("Pro"));
-    packetModel->setHorizontalHeaderItem(INFORMATION_COLUMN_INDEX, new QStandardItem("Info"));
+    packetModel->setHorizontalHeaderItem(PACKET_NUMBER_COLUMN_INDEX,
+        new QStandardItem("#"));
+    packetModel->setHorizontalHeaderItem(TIME_RECIEVED_COLUMN_INDEX,
+        new QStandardItem("Time"));
+    packetModel->setHorizontalHeaderItem(SOURCE_ADDRESS_COLUMN_INDEX,
+        new QStandardItem("Src"));
+    packetModel->setHorizontalHeaderItem(DESTINATION_ADDRESS_COLUMN_INDEX,
+        new QStandardItem("Dest"));
+    packetModel->setHorizontalHeaderItem(BINARY_DATA_SIZE_COLUMN_INDEX,
+        new QStandardItem("Size"));
+    packetModel->setHorizontalHeaderItem(HIGHEST_LEVEL_PROTOCOL_COLUMN_INDEX,
+        new QStandardItem("Pro"));
+    packetModel->setHorizontalHeaderItem(INFORMATION_COLUMN_INDEX,
+        new QStandardItem("Info"));
 
     packetModelProxy = new QSortFilterProxyModel(this);
     packetModelProxy->setSourceModel(packetModel);
     ui->packetTableView->setModel(packetModelProxy);
     ui->packetInfoTextArea->setWordWrapMode(QTextOption::NoWrap);
     ui->packetTableView->resizeColumnsToContents();
-    ui->packetTableView->verticalHeader()->setMaximumSectionSize(ui->packetTableView->verticalHeader()->fontMetrics().height() + 4);
-    ui->packetTableView->verticalHeader()->setDefaultSectionSize(ui->packetTableView->verticalHeader()->fontMetrics().height() + 4);
+    ui->packetTableView->verticalHeader()->setMaximumSectionSize(
+        ui->packetTableView->verticalHeader()->fontMetrics().height() + 4);
+    ui->packetTableView->verticalHeader()->setDefaultSectionSize(
+        ui->packetTableView->verticalHeader()->fontMetrics().height() + 4);
     ui->packetTableView->verticalHeader()->hide();
     ui->packetTableView->setSelectionBehavior(QAbstractItemView::SelectRows);
     ui->packetTableView->setEditTriggers(QAbstractItemView::NoEditTriggers);
@@ -46,22 +56,27 @@ MainWindow::MainWindow(QWidget* parent)
 
     packetSnifferThread = NULL;
     isSaved = false;
-
     auto device = packetSnifferThread->get_device_list();
 
     for (auto iter : device) {
         ui->combo_box_device_names->addItem(QString::fromStdString(iter));
     }
-
     // 默认值为0。如果值为-1，则将从所有列中读取键。
     packetModelProxy->setFilterKeyColumn(-1);
-    connect(ui->syntaxComboBox, SIGNAL(currentIndexChanged(int)), this, SLOT(select_filter_mode()));
-    connect(ui->filterLineEdit, SIGNAL(textChanged(QString)), this, SLOT(select_filter_mode()));
-    connect(ui->enable_match_case, SIGNAL(stateChanged(int)), this, SLOT(select_filter_mode()));
+    connect(ui->syntaxComboBox, SIGNAL(currentIndexChanged(int)), this,
+        SLOT(select_filter_mode()));
+    connect(ui->searchLineEdit, SIGNAL(textChanged(QString)), this,
+        SLOT(select_filter_mode()));
+    connect(ui->enable_match_case, SIGNAL(stateChanged(int)), this,
+        SLOT(select_filter_mode()));
 
-    if (ui->filterLineEdit->text().length() != 0) {
-        ui->statusBar->showMessage(
-            QString("%1 packet(s) containing the text '%2'").arg(packetModelProxy->rowCount()).arg(ui->filterLineEdit->text()));
+    connect(ui->filterlineEdit, SIGNAL(textChanged(QString)), this,
+        SLOT(get_filter_text()));
+
+    if (ui->searchLineEdit->text().length() != 0) {
+        ui->statusBar->showMessage(QString("%1 packet(s) containing the text '%2'")
+                                       .arg(packetModelProxy->rowCount())
+                                       .arg(ui->searchLineEdit->text()));
     }
     resize(1000, 600);
 }
@@ -82,7 +97,8 @@ void MainWindow::on_startCaptureButton_clicked()
 {
     // 如果这是第一个捕获，或者如果删除了先前的捕获，则创建一个新的PacketSnifferThread
     if (packetSnifferThread == NULL) {
-        packetSnifferThread = new PacketSnifferThread(packetModel, ui->statusBar, ui->combo_box_device_names->currentText());
+        packetSnifferThread = new PacketSnifferThread(
+            packetModel, ui->statusBar, ui->combo_box_device_names->currentText(), filter);
     }
 
     // 禁用和启用相关按钮
@@ -125,9 +141,16 @@ void MainWindow::on_actionResize_Columns_triggered()
 void MainWindow::on_packetTableView_clicked(const QModelIndex& index)
 {
     QModelIndex mappedIndex = packetModelProxy->mapToSource(index);
-    int rawDataIndex = packetModel->data(packetModel->index(mappedIndex.row(), PACKET_NUMBER_COLUMN_INDEX)).toInt();
-    int size = packetModel->data(packetModel->index(mappedIndex.row(), BINARY_DATA_SIZE_COLUMN_INDEX)).toInt();
-    packetSnifferThread->fillInfoAndRawDataWidgets(ui->packetInfoTextArea, ui->packetRawTextEdit, rawDataIndex, size);
+    int rawDataIndex = packetModel
+                           ->data(packetModel->index(mappedIndex.row(),
+                               PACKET_NUMBER_COLUMN_INDEX))
+                           .toInt();
+    int size = packetModel
+                   ->data(packetModel->index(mappedIndex.row(),
+                       BINARY_DATA_SIZE_COLUMN_INDEX))
+                   .toInt();
+    packetSnifferThread->fillInfoAndRawDataWidgets(
+        ui->packetInfoTextArea, ui->packetRawTextEdit, rawDataIndex, size);
     ui->packetInfoTextArea->moveCursor(QTextCursor::Start);
 }
 
@@ -137,13 +160,19 @@ void MainWindow::select_filter_mode()
     QRegExp regExp;
     if (ui->enable_match_case->isChecked()) {
         // 读取用于过滤源模型内容的键的列。
-        QRegExp regExp(ui->filterLineEdit->text(), Qt::CaseSensitive, syntax);
+        QRegExp regExp(ui->searchLineEdit->text(), Qt::CaseSensitive, syntax); // 区分大小写
         packetModelProxy->setFilterRegExp(regExp);
     } else {
-        QRegExp regExp(ui->filterLineEdit->text(), Qt::CaseInsensitive, syntax);
+        QRegExp regExp(ui->searchLineEdit->text(), Qt::CaseInsensitive, syntax); // 不区分大小写
         packetModelProxy->setFilterRegExp(regExp);
     }
 }
+
+void MainWindow::get_filter_text() {
+    filter = ui->filterlineEdit->text();
+}
+
+
 void MainWindow::on_hexViewRawButton_clicked()
 {
     if (packetSnifferThread != NULL) {
@@ -162,12 +191,6 @@ void MainWindow::on_binViewRawButton_clicked()
     if (ui->packetTableView->currentIndex().isValid()) {
         ui->packetTableView->clicked(ui->packetTableView->currentIndex());
     }
-}
-
-void MainWindow::on_clearFilterButton_clicked()
-{
-    ui->filterLineEdit->clear();
-    packetModelProxy->setFilterRegExp(".*");
 }
 
 void MainWindow::on_actionSave_triggered()
@@ -192,8 +215,8 @@ void MainWindow::on_actionSave_triggered()
 
     // 获取文件路径
     ui->statusBar->showMessage(QString("Saving capture..."));
-    QString filePath = QFileDialog::getSaveFileName(this,
-        "Save File",
+    QString filePath = QFileDialog::getSaveFileName(
+        this, "Save File",
         QStandardPaths::displayName(QStandardPaths::DesktopLocation),
         "Packet Sniffer Save (*.psnf)");
 
@@ -205,10 +228,12 @@ void MainWindow::on_actionSave_triggered()
 
     // 尝试保存捕获
     if (packetSnifferThread->saveCapture(filePath) == true) {
-        ui->statusBar->showMessage(QString("File succesfully saved to %1").arg(filePath));
+        ui->statusBar->showMessage(
+            QString("File succesfully saved to %1").arg(filePath));
         isSaved = true;
     } else {
-        ui->statusBar->showMessage(QString("Error saving file to %1").arg(filePath));
+        ui->statusBar->showMessage(
+            QString("Error saving file to %1").arg(filePath));
         isSaved = false;
     }
 }
@@ -216,14 +241,16 @@ void MainWindow::on_actionSave_triggered()
 void MainWindow::on_actionNew_Capture_triggered()
 {
     if (packetSnifferThread == NULL) { // 没有捕获正在运行，什么也没有保存
-        packetSnifferThread = new PacketSnifferThread(packetModel, ui->statusBar, ui->combo_box_device_names->currentText());
+        packetSnifferThread = new PacketSnifferThread(
+            packetModel, ui->statusBar, ui->combo_box_device_names->currentText(), filter);
     } else if (packetSnifferThread->isRunning()) { // 捕获仍在运行
         ui->statusBar->showMessage("Please stop the current capture.");
     } else if (isSaved == false) { // 捕获未运行，但未保存
         ui->deleteCaptureButton->click();
         if (packetSnifferThread == NULL) {
-            packetSnifferThread = new PacketSnifferThread(packetModel, ui->statusBar, ui->combo_box_device_names->currentText());
-        }
+            packetSnifferThread = new PacketSnifferThread(packetModel, ui->statusBar,
+                ui->combo_box_device_names->currentText(), filter);
+        } 
     } else {
         ui->deleteCaptureButton->setEnabled(true);
         ui->deleteCaptureButton->click();
@@ -239,8 +266,8 @@ void MainWindow::on_actionOpen_triggered()
         }
         ui->deleteCaptureButton->click();
     }
-    QString fileName = QFileDialog::getOpenFileName(this,
-        "Open File",
+    QString fileName = QFileDialog::getOpenFileName(
+        this, "Open File",
         QStandardPaths::displayName(QStandardPaths::DesktopLocation),
         "Packet Sniffer Save File(*.psnf);; All files(*.*)");
     // 如果用户单击“取消”，则返回
@@ -261,11 +288,10 @@ void MainWindow::on_deleteCaptureButton_clicked()
 {
     // 如果当前捕获未保存，则显示一个对话框，询问用户是否要保存或丢弃该捕获
     if (isSaved == false) {
-        QMessageBox yesnobox(QMessageBox::Warning,
-            "Unsaved Capture",
+        QMessageBox yesnobox(
+            QMessageBox::Warning, "Unsaved Capture",
             "Do you want to save the current capture?",
-            QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel,
-            this);
+            QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel, this);
         yesnobox.setDefaultButton(QMessageBox::Cancel);
 
         int action = yesnobox.exec();
@@ -287,15 +313,9 @@ void MainWindow::on_deleteCaptureButton_clicked()
     }
 }
 
-void MainWindow::on_actionStart_triggered()
-{
-    ui->startCaptureButton->click();
-}
+void MainWindow::on_actionStart_triggered() { ui->startCaptureButton->click(); }
 
-void MainWindow::on_actionPause_triggered()
-{
-    ui->pauseCaptureButton->click();
-}
+void MainWindow::on_actionPause_triggered() { ui->pauseCaptureButton->click(); }
 
 void MainWindow::on_actionClear_triggered()
 {

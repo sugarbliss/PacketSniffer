@@ -2,7 +2,6 @@
 #define PACKETSNIFFERTHREAD_H
 
 #include <vector>
-
 #include <QPlainTextEdit>
 #include <QStandardItemModel>
 #include <QStatusBar>
@@ -15,7 +14,7 @@ enum RawDataView {
 
 class PacketSnifferThread : public QThread {
 public:
-    PacketSnifferThread(QStandardItemModel* packetModel, QStatusBar* statusBar, QString device_name);
+    PacketSnifferThread(QStandardItemModel* packetModel, QStatusBar* statusBar, QString device_name, QString bpf_filter);
     PacketSnifferThread(QStandardItemModel* packetModel, QString& filePath, QStatusBar* statusBar);
     ~PacketSnifferThread();
 
@@ -29,7 +28,7 @@ private:
     RawDataView rawDataView;
     bool captureSaved;
     std::string device;
-
+    std::string bpfFilter;
     void run();
 
 public:

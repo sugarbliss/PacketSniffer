@@ -24,6 +24,7 @@
  * 
  */
 
+
 namespace Ui {
 class MainWindow;
 }
@@ -34,7 +35,7 @@ class MainWindow : public QMainWindow {
 public:
     explicit MainWindow(QWidget* parent = 0);
     ~MainWindow();
-    new_window* new_win;
+
 private slots:
     void on_startCaptureButton_clicked(); // 开始抓包
     void on_actionResize_Columns_triggered(); // 调整列的大小
@@ -42,8 +43,6 @@ private slots:
 
     void on_hexViewRawButton_clicked(); // 原始数据包视图切换为十六进制
     void on_binViewRawButton_clicked(); // 原始数据包视图切换为二进制
-
-    void on_clearFilterButton_clicked(); // 清除过滤器QLineEdit中的过滤器文本
 
     void on_actionSave_triggered(); // 仅在当前捕获未运行时保存它
 
@@ -63,12 +62,15 @@ private slots:
 
     void select_filter_mode(); // 选择过滤模式
 
+    void get_filter_text();
+
 private:
     Ui::MainWindow* ui;
     int numPackets;
     QStandardItemModel* packetModel;
     QSortFilterProxyModel* packetModelProxy;
     PacketSnifferThread* packetSnifferThread;
+    QString filter;
 
     bool isCapturing;
     bool isSaved;
